@@ -102,15 +102,15 @@ if __name__ == "__main__":
 
     print("Record Begin")
     rec = Recorder(1024, 2, 44100)
-    begin = time.time()
+    begin_time = time.time()
     rec.start()
-    iRange = 10.5
-    iBegin = time.time()
+    range_time = 10.5
+    begin_time = time.time()
     while 1:
-        if time.time() - iBegin >= iRange:
+        if time.time() - begin_time >= range_time:
             break
     rec.stop()
 
-    audioFileName = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_rate_" + str(rec.RATE) + ".wav"
-    print('DBG: %s auido saved' % audioFileName)
-    rec.save("record/" + audioFileName)
+    audio_file_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_rate_" + str(rec.RATE) + ".wav"
+    print('DBG: %s auido saved' % audio_file_name)
+    rec.save("record/" + audio_file_name)
