@@ -7,6 +7,7 @@ import wave
 import time
 import matplotlib.pyplot as plt
 import numpy as np
+import copy
 from datetime import datetime
 
 class Recorder:
@@ -17,7 +18,8 @@ class Recorder:
         self.RATE = rate
         self._running = True
         self._frames = []
-        self._read = []
+        self._read_queue_max_size = 5
+        self._read_queue = []
 
     def findInternalRecordingDevice(self, p):
         # 要找查的设备名称中的关键字
@@ -78,8 +80,9 @@ class Recorder:
             wave_data.shape = -1,2
             #将数组转置为 N-2 目标数组
             wave_data = wave_data.T
-            self._read = wave_data
-
+            if len(self._read_queue) >= self._read_queue_max_size:
+                self._read_queue = self._read_queue[1:]
+            self._read_queue.append(wave_data)
         # 停止读取输入流
         stream.stop_stream()
         # 关闭输入流
@@ -91,14 +94,17 @@ class Recorder:
 
     def __show(self):
         fig = plt.figure("audio time domain and frequency domain info")
-        time = range(self.CHUNK)
+        time = range(self.CHUNK * self._read_queue_max_size)
         time_domain_max = 0
         freq_domain_max = 0
-        
+
         while self._running:
-            if len(self._read) == 0:
+            if len(self._read_queue) == 0:
                 continue
-            wave_data = self._read
+            wave_data = copy.copy(self._read_queue[0])
+            for i, data in enumerate(self._read_queue):
+                if i > 0:
+                    wave_data = np.hstack((wave_data, data))
             plt.clf()
             ax = plt.subplot(211)
             cur_time_domain_max = np.max(wave_data[0])
@@ -107,8 +113,7 @@ class Recorder:
                     time_domain_max = cur_time_domain_max * 3
             else :
                 time_domain_max = cur_time_domain_max
-
-            ax.plot(time, wave_data[0],c='b') #第一幅图：左声道
+            ax.plot(time[:len(wave_data[0])], wave_data[0],c='b') #第一幅图：左声道
             plt.ylim([-1 * time_domain_max,time_domain_max])
             ax.set_title("audio time domain info")
             plt.xlabel("time (seconds)")
