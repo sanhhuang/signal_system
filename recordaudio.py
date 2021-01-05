@@ -5,6 +5,8 @@ import pyaudio
 import threading
 import wave
 import time
+import matplotlib.pyplot as plt
+import numpy as np
 from datetime import datetime
 
 class Recorder:
@@ -15,6 +17,7 @@ class Recorder:
         self.RATE = rate
         self._running = True
         self._frames = []
+        self._read = []
 
     def findInternalRecordingDevice(self, p):
         # 要找查的设备名称中的关键字
@@ -40,6 +43,7 @@ class Recorder:
     # 开始录音，开启一个新线程进行录音操作
     def start(self):
         threading._start_new_thread(self.__record, ())
+        threading._start_new_thread(self.__show, ())
 
     def showMicrophone(self):
         p = pyaudio.PyAudio()
@@ -68,7 +72,13 @@ class Recorder:
         # 循环读取输入流
         while self._running:
             data = stream.read(self.CHUNK)
-            self._frames.append(data)
+            #self._frames.append(data)
+            wave_data = np.frombuffer(data, dtype=np.short)
+            #2-N N维数组
+            wave_data.shape = -1,2
+            #将数组转置为 N-2 目标数组
+            wave_data = wave_data.T
+            self._read = wave_data
 
         # 停止读取输入流
         stream.stop_stream()
@@ -78,6 +88,53 @@ class Recorder:
         p.terminate()
         return
 
+
+    def __show(self):
+        fig = plt.figure("audio time domain and frequency domain info")
+        time = range(self.CHUNK)
+        time_domain_max = 0
+        freq_domain_max = 0
+        
+        while self._running:
+            if len(self._read) == 0:
+                continue
+            wave_data = self._read
+            plt.clf()
+            ax = plt.subplot(211)
+            cur_time_domain_max = np.max(wave_data[0])
+            if time_domain_max > cur_time_domain_max:
+                if time_domain_max//5 > cur_time_domain_max:
+                    time_domain_max = cur_time_domain_max * 3
+            else :
+                time_domain_max = cur_time_domain_max
+
+            ax.plot(time, wave_data[0],c='b') #第一幅图：左声道
+            plt.ylim([-1 * time_domain_max,time_domain_max])
+            ax.set_title("audio time domain info")
+            plt.xlabel("time (seconds)")
+            plt.ylabel("audio range")
+            plt.tight_layout()
+
+            ax = plt.subplot(212)
+            fft_y = np.fft.rfft(wave_data[1])/len(wave_data[1]) #右声部
+            freqs = np.linspace(0, self.RATE//2, len(wave_data[1])//2 + 1)
+            cur_freq_domain_max = np.max(fft_y)
+            if freq_domain_max > cur_freq_domain_max:
+                if freq_domain_max//5 > cur_freq_domain_max:
+                    freq_domain_max = cur_freq_domain_max * 3
+            else :
+                freq_domain_max = cur_freq_domain_max
+            ax.plot(freqs, np.abs(fft_y), c='g') #第一幅图：左声道
+            plt.ylim([0,freq_domain_max])
+            ax.set_title("audio frequency domain info")
+            plt.xlabel("frequency (hz)")
+            plt.ylabel("audio frequency")
+            plt.tight_layout()
+            plt.draw()
+            plt.pause(0.001)
+            # plt.show(block=False)
+        return
+    
     # 停止录音
     def stop(self):
         self._running = False
@@ -104,13 +161,14 @@ if __name__ == "__main__":
     rec = Recorder(1024, 2, 44100)
     begin_time = time.time()
     rec.start()
-    range_time = 10.5
+    range_time = 5.5
     begin_time = time.time()
     while 1:
         if time.time() - begin_time >= range_time:
             break
+    kry = input("press any key to stop")
     rec.stop()
-
+    exit()
     audio_file_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_rate_" + str(rec.RATE) + ".wav"
     print('DBG: %s auido saved' % audio_file_name)
     rec.save("record/" + audio_file_name)
