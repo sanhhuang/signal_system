@@ -1,6 +1,7 @@
 # _*_ coding: utf-8 _*_
 
 import os
+from numpy.lib.function_base import _select_dispatcher
 import pyaudio
 import threading
 import wave
@@ -9,16 +10,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 from datetime import datetime
+from processaudio import *
+from denoise import *
 
 class Recorder:
-    def __init__(self, chunk=1024, channels=2, rate=44100):
+    def __init__(self, chunk=1024, channels=2, rate=44100, is_save=True):
         self.CHUNK = chunk
         self.FORMAT = pyaudio.paInt16
         self.CHANNELS = channels
         self.RATE = rate
-        self._running = True
+        self._is_save = is_save
+        self._running = False
         self._frames = []
-        self._read_queue_max_size = 5
+        self._origin_data = b''
+        self._read_queue_max_size = 2
         self._read_queue = []
 
     def findInternalRecordingDevice(self, p):
@@ -44,6 +49,7 @@ class Recorder:
 
     # 开始录音，开启一个新线程进行录音操作
     def start(self):
+        self._running = True
         threading._start_new_thread(self.__record, ())
         threading._start_new_thread(self.__show, ())
 
@@ -74,7 +80,8 @@ class Recorder:
         # 循环读取输入流
         while self._running:
             data = stream.read(self.CHUNK)
-            #self._frames.append(data)
+            if self._is_save:
+                self._frames.append(data)
             wave_data = np.frombuffer(data, dtype=np.short)
             #2-N N维数组
             wave_data.shape = -1,2
@@ -93,11 +100,6 @@ class Recorder:
 
 
     def __show(self):
-        fig = plt.figure("audio time domain and frequency domain info")
-        time = range(self.CHUNK * self._read_queue_max_size)
-        time_domain_max = 0
-        freq_domain_max = 0
-
         while self._running:
             if len(self._read_queue) == 0:
                 continue
@@ -105,75 +107,62 @@ class Recorder:
             for i, data in enumerate(self._read_queue):
                 if i > 0:
                     wave_data = np.hstack((wave_data, data))
-            plt.clf()
-            ax = plt.subplot(211)
-            cur_time_domain_max = np.max(wave_data[0])
-            if time_domain_max > cur_time_domain_max:
-                if time_domain_max//5 > cur_time_domain_max:
-                    time_domain_max = cur_time_domain_max * 3
-            else :
-                time_domain_max = cur_time_domain_max
-            ax.plot(time[:len(wave_data[0])], wave_data[0],c='b') #第一幅图：左声道
-            plt.ylim([-1 * time_domain_max,time_domain_max])
-            ax.set_title("audio time domain info")
-            plt.xlabel("time (seconds)")
-            plt.ylabel("audio range")
-            plt.tight_layout()
-
-            ax = plt.subplot(212)
-            fft_y = np.fft.rfft(wave_data[1])/len(wave_data[1]) #右声部
-            freqs = np.linspace(0, self.RATE//2, len(wave_data[1])//2 + 1)
-            cur_freq_domain_max = np.max(fft_y)
-            if freq_domain_max > cur_freq_domain_max:
-                if freq_domain_max//5 > cur_freq_domain_max:
-                    freq_domain_max = cur_freq_domain_max * 3
-            else :
-                freq_domain_max = cur_freq_domain_max
-            ax.plot(freqs, np.abs(fft_y), c='g') #第一幅图：左声道
-            plt.ylim([0,freq_domain_max])
-            ax.set_title("audio frequency domain info")
-            plt.xlabel("frequency (hz)")
-            plt.ylabel("audio frequency")
-            plt.tight_layout()
-            plt.draw()
+            wave_data = Denoise(wave_data, self.RATE, is_show=False)
             plt.pause(0.001)
-            # plt.show(block=False)
         return
-    
+
+
     # 停止录音
     def stop(self):
         self._running = False
 
     # 保存到文件
     def save(self, fileName):
+        if self._is_save == False:
+            print("ignore save audio")
+            return
         p = pyaudio.PyAudio()
         wf = wave.open(fileName, "wb")
         
         wf.setnchannels(self.CHANNELS)
         wf.setsampwidth(p.get_sample_size(self.FORMAT))
         wf.setframerate(self.RATE)
-
-        wf.writeframes(b"".join(self._frames))
+        self._origin_data = b''.join(self._frames)
+        wf.writeframes(self._origin_data)
         wf.close()
 
+        wave_data = np.frombuffer(self._origin_data, dtype=np.short)
+        print(wave_data.shape)
+        #2-N N维数组
+        wave_data.shape = -1,2
+        #将数组转置为 N-2 目标数组
+        wave_data = Denoise(wave_data, self.RATE)
+        fileName = "filter_" + fileName
+        wf = wave.open(fileName, "wb")
+        wf.setnchannels(self.CHANNELS)
+        wf.setsampwidth(p.get_sample_size(self.FORMAT))
+        wf.setframerate(self.RATE)
+        wf.writeframes(wave_data.tostring())
+        print("filter_data len(%d)" % len(wave_data.tostring()))
+        wf.close()
 
 if __name__ == "__main__":
 
     if not os.path.exists("record"):
         os.makedirs("record")
+    if not os.path.exists("filter_record"):
+        os.makedirs("filter_record")
 
     print("Record Begin")
-    rec = Recorder(1024, 2, 44100)
+    rec = Recorder(1024, 2, 44100, False)
     begin_time = time.time()
     rec.start()
-    range_time = 5.5
+    range_time = 100
     begin_time = time.time()
     while 1:
         if time.time() - begin_time >= range_time:
             break
-    kry = input("press any key to stop")
     rec.stop()
-    exit()
     audio_file_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_rate_" + str(rec.RATE) + ".wav"
-    print('DBG: %s auido saved' % audio_file_name)
     rec.save("record/" + audio_file_name)
+    print('DBG: %s auido saved' % audio_file_name)
