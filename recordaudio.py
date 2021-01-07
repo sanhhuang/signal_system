@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 from datetime import datetime
-from processaudio import *
 from denoise import *
 
 class Recorder:
@@ -102,6 +101,7 @@ class Recorder:
 
 
     def __show(self):
+        return
         while self._running:
             if len(self._read_queue) == 0:
                 continue
