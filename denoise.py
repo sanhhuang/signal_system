@@ -13,8 +13,7 @@ def Denoise(sigs, sample_rate, is_plt=True, is_show=True):
         # filter_sigs_2 = SingleDenoise(sigs[1], sample_rate, is_plt=False, is_show=False)
         return np.c_[filter_sigs_1, filter_sigs_1].T
 
-def SingleDenoise(sigs, sample_rate, is_plt=True, is_show=True):
-
+def SingleDenoise(sigs, sample_rate, is_plt, is_show, name=''):
     times = np.arange(sigs.size) / sample_rate
     # fft变换
     freqs = nf.fftfreq(sigs.size, times[1] - times[0])
@@ -30,7 +29,8 @@ def SingleDenoise(sigs, sample_rate, is_plt=True, is_show=True):
         return (filter_sigs).astype(np.int16)
 
     # 绘图
-    plt.figure('Filter', facecolor='lightgray')
+    if is_show:
+        plt.figure('Filter'+name, facecolor='lightgray')
     plt.clf()
 
     ax = plt.subplot(221)
@@ -62,14 +62,19 @@ def SingleDenoise(sigs, sample_rate, is_plt=True, is_show=True):
     ax.set_title('Filter Time Domain', fontsize=12)
     # plt.legend()
     plt.tight_layout()
-    if is_show:
+    if is_show == True:
+        print(is_show)
         plt.show()
     else:
+        print(is_show)
         plt.draw()
+        plt.pause(0.001)
     
     return (filter_sigs).astype(np.int16)
 
 if __name__ == "__main__":
-    sample_rate, sigs = sw.read('./record/2021-01-06_20-39-27_rate_44100.wav')
-    sigs = Denoise(sigs, sample_rate)
-    sw.write('./filter_record/filter.wav', sample_rate, sigs)
+    sample_rate, sigs = sw.read('./record/2021-01-07_09-04-52_rate_44100.wav')
+    sigs = Denoise(sigs, sample_rate, "record")
+    sample_rate, sigs = sw.read('./filter_record/2021-01-07_09-04-52_rate_44100.wav')
+    sigs = Denoise(sigs, sample_rate, "filter")
+    # sw.write('./filter_record/filter.wav', sample_rate, sigs)

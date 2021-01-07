@@ -1,6 +1,7 @@
 # _*_ coding: utf-8 _*_
 
 import os
+from numpy.core.records import record
 from numpy.lib.function_base import _select_dispatcher
 import pyaudio
 import threading
@@ -25,6 +26,7 @@ class Recorder:
         self._origin_data = b''
         self._read_queue_max_size = 2
         self._read_queue = []
+        self.thread_pool = []
 
     def findInternalRecordingDevice(self, p):
         # 要找查的设备名称中的关键字
@@ -50,8 +52,8 @@ class Recorder:
     # 开始录音，开启一个新线程进行录音操作
     def start(self):
         self._running = True
-        threading._start_new_thread(self.__record, ())
-        threading._start_new_thread(self.__show, ())
+        self.thread_pool.append(threading._start_new_thread(self.__record, ()))
+        self.thread_pool.append(threading._start_new_thread(self.__show, ()))
 
     def showMicrophone(self):
         p = pyaudio.PyAudio()
@@ -107,8 +109,7 @@ class Recorder:
             for i, data in enumerate(self._read_queue):
                 if i > 0:
                     wave_data = np.hstack((wave_data, data))
-            wave_data = Denoise(wave_data, self.RATE, is_show=False)
-            plt.pause(0.001)
+            wave_data = Denoise(wave_data, self.RATE, is_plt=False, is_show=False)
         return
 
 
@@ -136,7 +137,7 @@ class Recorder:
         #2-N N维数组
         wave_data.shape = -1,2
         #将数组转置为 N-2 目标数组
-        wave_data = Denoise(wave_data, self.RATE)
+        wave_data = Denoise(wave_data, self.RATE, is_plt=True, is_show=True)
         fileName = "filter_" + fileName
         wf = wave.open(fileName, "wb")
         wf.setnchannels(self.CHANNELS)
@@ -154,10 +155,11 @@ if __name__ == "__main__":
         os.makedirs("filter_record")
 
     print("Record Begin")
-    rec = Recorder(1024, 2, 44100, False)
+    rates=[44100, 22050, 11025, 5510]
+    rec = Recorder(1024, 2, rates[0])
     begin_time = time.time()
     rec.start()
-    range_time = 100
+    range_time = 5
     begin_time = time.time()
     while 1:
         if time.time() - begin_time >= range_time:
