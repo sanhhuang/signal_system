@@ -20,7 +20,7 @@ def SingleDenoise(sigs, sample_rate, is_plt, is_show, name=''):
     comp_arr = nf.fft(sigs)
     pows = np.abs(comp_arr)
     # 在频谱中去除噪声
-    condition = ((np.abs(freqs) > 50) & (np.abs(freqs) < 4000))
+    condition = ((np.abs(freqs) > 50) & (np.abs(freqs) < 20000))
     comp_arr = np.where(condition, comp_arr, 0)
     filter_pows = np.abs(comp_arr)
     # 逆向傅里叶变换
@@ -75,6 +75,6 @@ def SingleDenoise(sigs, sample_rate, is_plt, is_show, name=''):
 if __name__ == "__main__":
     sample_rate, sigs = sw.read('./record/2021-01-07_09-04-52_rate_44100.wav')
     sigs = Denoise(sigs, sample_rate, "record")
-    sample_rate, sigs = sw.read('./filter_record/2021-01-07_09-04-52_rate_44100.wav')
-    sigs = Denoise(sigs, sample_rate, "filter")
+    # sample_rate, sigs = sw.read('./filter_record/2021-01-07_09-04-52_rate_44100.wav')
+    # sigs = Denoise(sigs, sample_rate, "")
     # sw.write('./filter_record/filter.wav', sample_rate, sigs)

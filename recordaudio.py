@@ -52,7 +52,6 @@ class Recorder:
     def start(self):
         self._running = True
         self.thread_pool.append(threading._start_new_thread(self.__record, ()))
-        self.thread_pool.append(threading._start_new_thread(self.__show, ()))
 
     def showMicrophone(self):
         p = pyaudio.PyAudio()
@@ -100,19 +99,6 @@ class Recorder:
         return
 
 
-    def __show(self):
-        return
-        while self._running:
-            if len(self._read_queue) == 0:
-                continue
-            wave_data = copy.copy(self._read_queue[0])
-            for i, data in enumerate(self._read_queue):
-                if i > 0:
-                    wave_data = np.hstack((wave_data, data))
-            wave_data = Denoise(wave_data, self.RATE, is_plt=False, is_show=False)
-        return
-
-
     # 停止录音
     def stop(self):
         self._running = False
@@ -155,8 +141,8 @@ if __name__ == "__main__":
         os.makedirs("filter_record")
 
     print("Record Begin")
-    rates=[44100, 22050, 11025, 5510]
-    rec = Recorder(1024, 2, rates[0])
+    rates=[44100, 22050, 11025, 5510, 2750]
+    rec = Recorder(1024, 2, rates[4])
     begin_time = time.time()
     rec.start()
     range_time = 5
